@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>白噪音专注倒计时</title>
+    <!-- 引入Font Awesome图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 全局样式重置 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f0f4f8;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            gap: 30px;
+        }
+
+        /* 通用卡片容器样式 */
+        .card-container {
+            background: transparent;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            padding: 40px;
+            width: 100%;
+            max-width: 500px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 白噪音播放器背景图片层 */
+        #player-container::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: var(--bg-image, url('images/rain-bg.jpg'));
+            background-size: cover;
+            background-position: center;
+            opacity: 0.25;
+            z-index: -1;
+            transition: background-image 0.5s ease;
+        }
+
+        /* 白噪音播放器内容层级 */
+        .sound-display, .controls {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 白噪音播放器样式 */
+        .sound-display {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .sound-icon-large {
+            font-size: 64px;
+            color: #4a6fa5;
+            margin-bottom: 16px;
+            transition: color 0.3s;
+        }
+
+        .current-sound-name {
+            font-size: 24px;
+            color: #2d3748;
+            margin-bottom: 8px;
+            text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+        }
+
+        .current-sound-desc {
+            color: #718096;
+            font-size: 16px;
+            text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .sound-dropdown {
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            font-size: 16px;
+            color: #2d3748;
+            background-color: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .sound-dropdown:focus {
+            outline: none;
+            border-color: #4a6fa5;
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .volume-slider-large {
+            flex: 1;
+            height: 8px;
+            accent-color: #4a6fa5;
+            cursor: pointer;
+        }
+
+        .volume-value {
+            min-width: 50px;
+            text-align: center;
+            color: #4a6fa5;
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+        }
+
+        .btn-container {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn-play, .btn-timer {
+            flex: 1;
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-play {
+            background-color: #4a6fa5;
+            color: white;
+        }
+
+        .btn-play:hover {
+            background-color: #3a5a8c;
+        }
+
+        .btn-timer {
+            background-color: rgba(240, 244, 248, 0.8);
+            color: #4a6fa5;
+            border: 1px solid #e2e8f0;
+        }
+
+        .btn-timer:hover {
+            background-color: rgba(226, 232, 240, 0.8);
+        }
+
+        /* 倒计时模块样式 */
+        .countdown-header {
+            font-family: 'Inter', sans-serif;
+            color: #2d3748;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .info {
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            color: #4a5568;
+            text-align: center;
+        }
+
+        /* 进度条样式 */
+        .progress-container {
+            width: 100%;
+            height: 12px;
+            background-color: rgba(226, 232, 240, 0.8);
+            border-radius: 6px;
+            margin: 20px 0 30px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: #4a6fa5;
+            border-radius: 6px;
+            width: 100%;
+            transition: width 0.5s ease, background-color 0.5s ease;
+        }
+
+        .countdown-wrapper {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 10px;
+            justify-content: center;
+        }
+
+        .time-box {
+            background: rgba(74, 111, 165, 0.1);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            min-width: 100px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(74, 111, 165, 0.1);
+        }
+
+        .number {
+            font-size: 3rem;
+            font-weight: 700;
+            display: block;
+            font-feature-settings: "tnum";
+            font-variant-numeric: tabular-nums;
+            color: #2d3748;
+        }
+
+        .label {
+            font-size: 0.9rem;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 5px;
+            display: block;
+        }
+
+        .countdown-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-top: 20px;
+            justify-content: center;
+        }
+
+        .countdown-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s;
+        }
+
+        .countdown-btn:hover {
+            background: #2563eb;
+        }
+
+        /* Toast提示样式 */
+        #audio-toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        /* 响应式适配 */
+        @media (max-width: 480px) {
+            .card-container {
+                padding: 20px;
+            }
+
+            .sound-icon-large {
+                font-size: 48px;
+            }
+
+            .btn-container {
+                flex-direction: column;
+            }
+
+            .countdown-wrapper {
+                gap: 10px;
+            }
+
+            .time-box {
+                min-width: 70px;
+                padding: 15px;
+            }
+
+            .number {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 白噪音播放器模块 -->
+    <div class="card-container" id="player-container">
+        <div class="sound-display">
+            <div class="sound-icon-large">
+                <i id="current-sound-icon" class="fas fa-cloud-rain"></i>
+            </div>
+            <h3 id="current-sound-name" class="current-sound-name">细雨</h3>
+            <p id="current-sound-desc" class="current-sound-desc">轻柔雨滴声，帮助集中注意力</p>
+        </div>
+
+        <div class="controls">
+            <select id="sound-select" class="sound-dropdown">
+                <option value="rain">🌧️ 细雨</option>
+                <option value="waves">🌊 海浪</option>
+                <option value="fire">🔥 篝火</option>
+                <option value="cafe">☕ 咖啡馆</option>
+            </select>
+
+            <div class="volume-control">
+                <i class="fas fa-volume-up" style="color: #4a6fa5;"></i>
+                <input id="volume-slider" type="range" class="volume-slider-large" value="80" min="0" max="100">
+                <span id="volume-value" class="volume-value">80%</span>
+            </div>
+
+            <div class="btn-container">
+                <button id="play-btn" class="btn-play">
+                    <i class="fas fa-play-circle"></i>
+                    <span>开始专注</span>
+                </button>
+                <button id="timer-btn" class="btn-timer">
+                    <i class="fas fa-clock"></i>
+                    <span>设置时长</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 倒计时模块 -->
+    <div class="card-container">
+        <h1 class="countdown-header">专注倒计时</h1>
+
+        <div class="info">
+            当前时长: <span id="target-minutes">30</span> 分钟
+        </div>
+
+        <!-- 进度条 -->
+        <div class="progress-container">
+            <div id="progress-fill" class="progress-fill"></div>
+        </div>
+
+        <div class="countdown-wrapper">
+            <div class="time-box">
+                <span id="minutes" class="number">30</span>
+                <span class="label">Minutes</span>
+            </div>
+            <div class="time-box">
+                <span id="seconds" class="number">00</span>
+                <span class="label">Seconds</span>
+            </div>
+        </div>
+
+        <div class="countdown-controls">
+            <button id="start-btn" class="countdown-btn">开始</button>
+            <button id="stop-btn" class="countdown-btn">停止</button>
+        </div>
+    </div>
+
+    <!-- Toast提示容器 -->
+    <div id="audio-toast"></div>
+
+    <script>
+        /**
+         * 倒计时管理器类
+         */
+        class CountdownManager {
+            constructor(options) {
+                this.totalSeconds = options.minutes * 60;
+                this.remainingSeconds = this.totalSeconds;
+                this.onUpdate = options.onUpdate || (() => {});
+                this.onComplete = options.onComplete || (() => {});
+                this.timer = null;
+                this.isRunning = false;
+                this.updateProgress();
+            }
+
+            // 设置新时长
+            setMinutes(minutes) {
+                this.stop();
+                this.totalSeconds = minutes * 60;
+                this.remainingSeconds = this.totalSeconds;
+                this.updateDisplay();
+                this.updateProgress();
+            }
+
+            // 开始倒计时
+            start() {
+                if (this.isRunning || this.remainingSeconds <= 0) return;
+                this.isRunning = true;
+                if (this.timer) clearInterval(this.timer);
+
+                this.timer = setInterval(() => {
+                    this.remainingSeconds--;
+                    this.updateDisplay();
+                    this.updateProgress();
+
+                    if (this.remainingSeconds <= 0) {
+                        this.stop();
+                        this.onComplete();
+                    }
+                }, 1000);
+
+                this.updateDisplay();
+                this.updateProgress();
+            }
+
+            // 停止倒计时
+            stop() {
+                this.isRunning = false;
+                if (this.timer) {
+                    clearInterval(this.timer);
+                    this.timer = null;
+                }
+            }
+
+            // 获取剩余时间
+            getRemainingTime() {
+                const minutes = Math.floor(this.remainingSeconds / 60);
+                const seconds = this.remainingSeconds % 60;
+                return { minutes, seconds };
+            }
+
+            // 更新进度条
+            updateProgress() {
+                if (this.totalSeconds <= 0) return;
+                const progressRatio = this.remainingSeconds / this.totalSeconds;
+                const progressPercent = Math.max(0, Math.min(100, progressRatio * 100));
+
+                const progressFill = document.getElementById('progress-fill');
+                if (progressFill) {
+                    progressFill.style.width = `${progressPercent}%`;
+
+                    // 进度条颜色渐变
+                    if (progressPercent < 20) {
+                        progressFill.style.backgroundColor = '#e53e3e';
+                    } else if (progressPercent < 50) {
+                        progressFill.style.backgroundColor = '#ed8936';
+                    } else {
+                        progressFill.style.backgroundColor = '#4a6fa5';
+                    }
+                }
+            }
+
+            // 更新数字显示
+            updateDisplay() {
+                const remaining = this.getRemainingTime();
+                const formatNum = (num) => num.toString().padStart(2, '0');
+
+                const elMinutes = document.getElementById('minutes');
+                const elSeconds = document.getElementById('seconds');
+
+                if (elMinutes) elMinutes.textContent = formatNum(remaining.minutes);
+                if (elSeconds) elSeconds.textContent = formatNum(remaining.seconds);
+
+                this.onUpdate(remaining);
+            }
+        }
+
+        /**
+         * 白噪音播放器类
+         */
+        class AudioPlayer {
+            constructor(config) {
+                this.sounds = config.sounds;
+                this.currentSound = null;
+                this.audioElements = {};
+                this.isPlaying = false;
+                this.volume = config.initialVolume || 80;
+
+                this.initAudio();
+                this.bindDOMEvents();
+                this.initDefaultUI();
+            }
+
+            // 初始化音频
+            initAudio() {
+                // 预加载音频和背景图
+                Object.keys(this.sounds).forEach(soundKey => {
+                    // 预加载音频
+                    const audio = new Audio(this.sounds[soundKey].url);
+                    audio.loop = true;
+                    audio.volume = this.volume / 100;
+                    this.audioElements[soundKey] = audio;
+
+                    // 预加载背景图
+                    const img = new Image();
+                    img.src = this.sounds[soundKey].backgroundImage;
+                });
+            }
+
+            // 绑定DOM事件
+            bindDOMEvents() {
+                // 播放/暂停按钮
+                const playBtn = document.getElementById('play-btn');
+                if (playBtn) {
+                    playBtn.addEventListener('click', () => {
+                        const selectedKey = document.getElementById('sound-select').value;
+                        this.togglePlay(selectedKey);
+                    });
+                }
+
+                // 音效选择下拉框
+                const soundSelect = document.getElementById('sound-select');
+                if (soundSelect) {
+                    soundSelect.addEventListener('change', (e) => {
+                        const newSoundKey = e.target.value;
+                        if (this.isPlaying) {
+                            this.stopAll();
+                            this.currentSound = newSoundKey;
+                            this.play(newSoundKey);
+                        } else {
+                            this.currentSound = newSoundKey;
+                            this.updateUI();
+                        }
+                    });
+                }
+
+                // 音量调节
+                const volumeSlider = document.getElementById('volume-slider');
+                if (volumeSlider) {
+                    volumeSlider.addEventListener('input', (e) => {
+                        this.setVolume(Number(e.target.value));
+                    });
+                }
+
+                // 设置时长按钮
+                const timerBtn = document.getElementById('timer-btn');
+                if (timerBtn) {
+                    timerBtn.addEventListener('click', () => {
+                        this.openTimerModal();
+                    });
+                }
+
+                // 页面卸载清理
+                window.addEventListener('beforeunload', () => {
+                    this.stopAll();
+                });
+            }
+
+            // 初始化默认UI
+            initDefaultUI() {
+                this.currentSound = 'rain'; // 默认选中雨声
+                this.setVolume(this.volume);
+                this.updateUI();
+            }
+
+            // 播放音效
+            play(soundKey) {
+                if (!this.audioElements[soundKey]) return;
+
+                const audio = this.audioElements[soundKey];
+                audio.play().then(() => {
+                    this.isPlaying = true;
+                    this.currentSound = soundKey;
+                    this.updateUI();
+                    this.showToast(`开始播放：${this.sounds[soundKey].name}`);
+                }).catch((e) => {
+                    console.error('播放失败:', e);
+                    this.showToast('请先点击页面激活音频播放');
+                });
+            }
+
+            // 暂停音效
+            pause(soundKey) {
+                if (!this.audioElements[soundKey]) return;
+
+                const audio = this.audioElements[soundKey];
+                audio.pause();
+                this.isPlaying = false;
+                this.updateUI();
+                this.showToast(`暂停播放：${this.sounds[soundKey].name}`);
+            }
+
+            // 切换播放/暂停
+            togglePlay(soundKey) {
+                if (this.isPlaying && this.currentSound === soundKey) {
+                    this.pause(soundKey);
+                } else {
+                    this.stopAll();
+                    this.play(soundKey);
+                }
+            }
+
+            // 停止所有音效
+            stopAll() {
+                Object.values(this.audioElements).forEach(audio => {
+                    audio.pause();
+                    audio.currentTime = 0;
+                });
+                this.isPlaying = false;
+                this.updateUI();
+            }
+
+            // 设置音量
+            setVolume(volume) {
+                this.volume = Math.max(0, Math.min(100, volume));
+
+                Object.values(this.audioElements).forEach(audio => {
+                    audio.volume = this.volume / 100;
+                });
+
+                const volumeValue = document.getElementById('volume-value');
+                const volumeSlider = document.getElementById('volume-slider');
+
+                if (volumeValue) volumeValue.textContent = `${this.volume}%`;
+                if (volumeSlider) volumeSlider.value = this.volume;
+
+                this.showToast(`音量已设置为：${this.volume}%`);
+            }
+
+            // 打开时长设置弹窗
+            openTimerModal() {
+                const timerOptions = [5, 10, 15, 20, 30, 60];
+                const currentMinutes = document.getElementById('target-minutes').textContent;
+
+                const selected = prompt(
+                    `请选择专注时长（分钟）：\n可选：${timerOptions.join('、')}`,
+                    currentMinutes
+                );
+
+                const minutes = Number(selected);
+                if (!isNaN(minutes) && minutes > 0) {
+                    window.countdownManager.setMinutes(minutes);
+                    document.getElementById('target-minutes').textContent = minutes;
+                    this.showToast(`已设置专注时长：${minutes}分钟`);
+                } else if (selected !== null) {
+                    this.showToast('请输入有效的数字（如：5/10/30）');
+                }
+            }
+
+            // 更新背景图片
+            updateBackgroundImage() {
+                const playerContainer = document.getElementById('player-container');
+                if (!playerContainer || !this.currentSound) return;
+
+                const bgImageUrl = this.sounds[this.currentSound].backgroundImage;
+                playerContainer.style.setProperty('--bg-image', `url('${bgImageUrl}')`);
+            }
+
+            // 更新UI
+            updateUI() {
+                const playBtn = document.getElementById('play-btn');
+                if (!playBtn || !this.currentSound) return;
+
+                const playIcon = playBtn.querySelector('i');
+                const playText = playBtn.querySelector('span');
+                const soundConfig = this.sounds[this.currentSound];
+
+                // 更新图标、名称、描述
+                const soundIcon = document.getElementById('current-sound-icon');
+                const soundName = document.getElementById('current-sound-name');
+                const soundDesc = document.getElementById('current-sound-desc');
+                const soundSelect = document.getElementById('sound-select');
+
+                if (soundIcon) soundIcon.className = `fas ${soundConfig.icon}`;
+                if (soundName) soundName.textContent = soundConfig.name;
+                if (soundDesc) soundDesc.textContent = soundConfig.desc;
+                if (soundSelect) soundSelect.value = this.currentSound;
+
+                // 更新播放按钮状态
+                if (this.isPlaying) {
+                    playIcon.className = 'fas fa-pause-circle';
+                    playText.textContent = '暂停专注';
+                } else {
+                    playIcon.className = 'fas fa-play-circle';
+                    playText.textContent = '开始专注';
+                }
+
+                // 更新背景图片
+                this.updateBackgroundImage();
+            }
+
+            // 显示提示框
+            showToast(message) {
+                const toast = document.getElementById('audio-toast');
+                toast.textContent = message;
+                toast.style.opacity = '1';
+
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                }, 3000);
+            }
+        }
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', () => {
+            // 音效配置（替换为你的实际路径）
+            const SOUND_CONFIG = {
+                rain: {
+                    url: 'sounds/rain.mp3',
+                    icon: 'fa-cloud-rain',
+                    name: '细雨',
+                    desc: '轻柔雨滴声，帮助集中注意力',
+                    backgroundImage: 'images/rain-bg.jpg'
+                },
+                waves: {
+                    url: 'sounds/waves.mp3',
+                    icon: 'fa-water',
+                    name: '海浪',
+                    desc: '海岸涛声，舒缓放松',
+                    backgroundImage: 'images/waves-bg.webp'
+                },
+                fire: {
+                    url: 'sounds/fire.mp3',
+                    icon: 'fa-fire',
+                    name: '篝火',
+                    desc: '噼啪燃烧声，温暖安心',
+                    backgroundImage: 'images/fire-bg.png'
+                },
+                cafe: {
+                    url: 'sounds/cafe.mp3',
+                    icon: 'fa-coffee',
+                    name: '咖啡馆',
+                    desc: '背景交谈声，创造工作氛围',
+                    backgroundImage: 'images/cafe-bg.jpg'
+                }
+            };
+
+            // 初始化播放器
+            const audioPlayer = new AudioPlayer({
+                sounds: SOUND_CONFIG,
+                initialVolume: 80
+            });
+
+            // 初始化倒计时
+            const defaultMinutes = Number(document.getElementById('target-minutes').textContent) || 30;
+            window.countdownManager = new CountdownManager({
+                minutes: defaultMinutes,
+                onComplete: () => {
+                    audioPlayer.stopAll();
+                    audioPlayer.showToast('专注时间结束！已停止播放白噪音');
+                }
+            });
+
+            // 绑定倒计时按钮事件
+            document.getElementById('start-btn').addEventListener('click', () => {
+                window.countdownManager.start();
+                audioPlayer.showToast('专注倒计时已开始！');
+            });
+
+            document.getElementById('stop-btn').addEventListener('click', () => {
+                window.countdownManager.stop();
+                audioPlayer.showToast('专注倒计时已停止！');
+            });
+        });
+    </script>
+</body>
+</html>
